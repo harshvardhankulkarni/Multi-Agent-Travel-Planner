@@ -1,0 +1,30 @@
+{
+  "defaults": {
+    "project": 1,
+    "env": 1
+  },
+  "actives": {
+    "project": 1,
+    "env": 1
+  },
+  "projects": [
+    {
+      "idx": 1,
+      "id": "25342000000537287",
+      "name": "Multiagent-Travel-Planner",
+      "domain": {
+        "id": "50047287457",
+        "name": "multiagent-travel-planner-60057482421.development"
+      },
+      "timezone": "Asia/Kolkata",
+      "env": [
+        {
+          "idx": 1,
+          "id": "60057482421",
+          "name": "Development",
+          "type": 3
+        }
+      ]
+    }
+  ]
+}

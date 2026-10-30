@@ -1,0 +1,12 @@
+{
+  "command": "node app.js",
+  "build_path": "./",
+  "stack": "node24",
+  "env_variables": {
+    "QUICKML_LLM_ENDPOINT": "glm-flash-47",
+    "QUICKML_ORG_ID": "60057482421",
+    "STRATUS_BUCKET": "travel-planner-sessions-60057482421"
+  },
+  "memory": 512,
+  "scripts": {}
+}

@@ -1,0 +1,1196 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Travel Team Planner</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js" integrity="sha384-/TQbtLCAerC3jgaim+N78RZSDYV7ryeoBCVqTuzRrFec2akfBkHS7ACQ3PQhvMVi" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js" integrity="sha384-+VfUPEb0PdtChMwmBcBmykRMDd+v6D/oFmB3rZM/puCMDYcIvF968OimRh4KQY9a" crossorigin="anonymous"></script>
+<style>
+  :root {
+    --paper: #F4F7FB; --surface: #FFFFFF; --ink: #16233A; --muted: #5D6B82; --line: #DCE3EC;
+    --brand: #1D5C7A; --brand-soft: #E3EFF5; --run: #D98A1C; --ok: #2F8F5B; --err: #C2413B;
+    --a-planner: #1D5C7A; --a-flights: #2F6FDB; --a-stays: #8A4FB5; --a-activities: #1E9A8A; --a-local: #B7791F;
+    --radius: 14px; --font: "Onest", system-ui, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #0F1622; --surface: #172131; --ink: #E6ECF5; --muted: #93A1B8; --line: #26334A;
+      --brand: #6FB3D6; --brand-soft: #1B3245; --run: #F0B04A; --ok: #5CC28A; --err: #EF7A72;
+      --a-planner: #6FB3D6; --a-flights: #7EA6F5; --a-stays: #C39BE0; --a-activities: #5CCBBB; --a-local: #E3B04B;
+    }
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { height: 100%; }
+  body { margin: 0; font: 15px/1.6 var(--font); color: var(--ink); background: var(--paper); display: flex; overflow: hidden; }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  :focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; border-radius: 6px; }
+  svg { flex: none; }
+
+  /* ---------- Sidebar ---------- */
+  .side { width: 272px; background: var(--surface); border-right: 1px solid var(--line); display: flex; flex-direction: column; z-index: 20; }
+  .brand { display: flex; align-items: center; gap: 10px; padding: 18px 18px 14px; font-weight: 700; font-size: 16px; }
+  .brand svg { color: var(--brand); }
+  .new { margin: 0 14px 10px; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--paper); font-weight: 600; }
+  .new:hover { border-color: var(--brand); color: var(--brand); }
+  .list-head { padding: 10px 18px 6px; font-size: 12.5px; color: var(--muted); }
+  #sessions { list-style: none; margin: 0; padding: 0 8px 12px; overflow-y: auto; flex: 1; }
+  #sessions li { position: relative; }
+  .s-open { width: 100%; display: block; text-align: left; border: 0; background: none; padding: 8px 40px 8px 10px; border-radius: 9px; }
+  .s-open:hover, li.active .s-open { background: var(--brand-soft); }
+  .s-title { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500; font-size: 14px; }
+  .s-time { font-size: 12px; color: var(--muted); }
+  .s-del { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); border: 0; background: none; color: var(--muted); padding: 4px 6px; border-radius: 6px; font-size: 12px; opacity: 0; }
+  li:hover .s-del, .s-del:focus-visible, .s-del.confirm { opacity: 1; }
+  .s-del:hover { color: var(--err); }
+  .s-del.confirm { color: #fff; background: var(--err); }
+
+  /* ---------- Main ---------- */
+  main { flex: 1; display: flex; flex-direction: column; min-width: 0; position: relative; }
+  .top { display: none; align-items: center; gap: 10px; padding: 10px 16px; border-bottom: 1px solid var(--line); background: var(--surface); }
+  .top .title { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .icon-btn { border: 0; background: none; padding: 6px; border-radius: 8px; display: inline-flex; }
+  #chat { flex: 1; overflow-y: auto; padding: 32px 24px 24px; }
+  .turn { max-width: 760px; margin: 0 auto 28px; }
+  .turn.user { display: flex; justify-content: flex-end; }
+  .bubble { background: var(--brand-soft); padding: 10px 16px; border-radius: 18px 18px 4px 18px; max-width: 82%; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .turn.bot { display: grid; grid-template-columns: 32px 1fr; gap: 14px; }
+  .avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--brand); color: var(--surface); display: grid; place-items: center; }
+  .bot-body { min-width: 0; }
+
+  /* ---------- Travel team panel (the live agent route) ---------- */
+  .team { border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); margin-bottom: 14px; }
+  .team summary { list-style: none; display: flex; align-items: center; gap: 10px; padding: 10px 14px; cursor: pointer; font-weight: 500; color: var(--muted); user-select: none; }
+  .team summary::-webkit-details-marker { display: none; }
+  .team summary .chev { margin-left: auto; transition: transform .2s; }
+  .team[open] summary .chev { transform: rotate(180deg); }
+  .team.live summary { color: var(--ink); }
+  .shimmer { background: linear-gradient(90deg, var(--ink) 0%, var(--muted) 40%, var(--ink) 80%); background-size: 200% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: shimmer 1.8s linear infinite; }
+  @keyframes shimmer { to { background-position: -200% 0; } }
+  .orb { width: 10px; height: 10px; border-radius: 50%; background: var(--ok); }
+  .team.live .orb { background: var(--run); animation: breathe 1.2s ease-in-out infinite; }
+  .team.failed .orb { background: var(--err); }
+  @keyframes breathe { 50% { transform: scale(.6); opacity: .5; } }
+
+  .route { list-style: none; margin: 0; padding: 4px 14px 14px; position: relative; }
+  .step { display: grid; grid-template-columns: 30px 1fr auto; gap: 12px; align-items: start; padding: 8px 0; position: relative; }
+  .step + .step::before { content: ""; position: absolute; left: 14px; top: -10px; height: 18px; border-left: 2px dashed var(--line); }
+  .node { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; color: var(--c); background: color-mix(in srgb, var(--c) 14%, transparent); position: relative; }
+  .step.queued .node { opacity: .45; }
+  .step.running .node::after { content: ""; position: absolute; inset: -3px; border-radius: 50%; border: 2px solid transparent; border-top-color: var(--c); border-right-color: var(--c); animation: spin .9s linear infinite; }
+  .step.done .node { background: var(--c); color: var(--surface); }
+  .step.error .node { background: var(--err); color: #fff; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .s-name { font-weight: 600; font-size: 14px; line-height: 1.3; }
+  .s-status { font-size: 13px; color: var(--muted); line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .step.running .s-status { color: var(--ink); }
+  .s-pick { margin-top: 4px; font-size: 13px; }
+  .s-pick b { font-weight: 600; }
+  .s-meta { text-align: right; font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; line-height: 1.5; }
+  .s-cost { color: var(--ink); font-weight: 600; }
+  .step .peek { grid-column: 2 / 4; display: none; font-size: 12px; background: var(--paper); border-radius: 8px; padding: 8px 10px; max-height: 240px; overflow: auto; white-space: pre-wrap; margin: 4px 0 0; }
+  .step.show-peek .peek { display: block; }
+  .peek-btn { border: 0; background: none; padding: 0; color: var(--brand); font-size: 12.5px; }
+
+  /* ---------- Answer ---------- */
+  .answer { overflow-wrap: anywhere; }
+  .answer > :first-child { margin-top: 0; }
+  .answer h2 { font-size: 19px; margin: 30px 0 10px; letter-spacing: -0.01em; }
+  .answer h3 { font-size: 16px; margin: 20px 0 4px; }
+  .answer p { margin: 8px 0; }
+  .answer ul, .answer ol { padding-left: 22px; }
+  .answer table { border-collapse: separate; border-spacing: 0; margin: 12px 0; font-variant-numeric: tabular-nums; width: 100%; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  .answer th, .answer td { border-bottom: 1px solid var(--line); padding: 9px 14px; text-align: left; vertical-align: top; }
+  .answer tr:last-child td { border-bottom: 0; }
+  .answer th { color: var(--muted); font-weight: 500; background: var(--paper); }
+  .answer td:first-child { white-space: nowrap; font-weight: 500; }
+
+  /* ---------- Trip header (title, chips, photos, profile used, budget reality) ---------- */
+  .trip-head { margin-bottom: 18px; }
+  .trip-head h2 { font-size: 22px; line-height: 1.25; margin: 0 0 10px; letter-spacing: -0.01em; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+  .chip { font-size: 12.5px; font-weight: 500; padding: 3px 10px; border-radius: 99px; background: var(--paper); border: 1px solid var(--line); }
+  .chip.ok { color: var(--ok); background: color-mix(in srgb, var(--ok) 12%, transparent); border-color: transparent; }
+  .chip.info { color: var(--brand); background: var(--brand-soft); border-color: transparent; }
+  .collage { display: grid; grid-template-columns: 2fr 1fr; grid-template-rows: 1fr 1fr; gap: 4px; height: 300px; border-radius: 16px; overflow: hidden; margin-bottom: 16px; }
+  .collage .ph { background: linear-gradient(135deg, var(--brand), color-mix(in srgb, var(--brand) 40%, var(--a-activities))); position: relative; overflow: hidden; }
+  .collage .ph:first-child { grid-row: 1 / 3; }
+  .collage img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .trip-head .dates { font-size: 21px; margin: 0 0 4px; }
+  .trip-head .tagline { font-weight: 600; margin: 0 0 10px; }
+  .trip-head .used { margin: 0 0 12px; }
+  .reality { margin-top: 20px; }
+  .reality h3 { font-size: 19px; margin: 0 0 10px; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin-bottom: 10px; }
+  .tile { border: 1px solid var(--line); background: var(--surface); border-radius: 14px; padding: 12px 14px; }
+  .tile small { display: block; color: var(--muted); font-size: 12.5px; }
+  .tile b { display: block; font-size: 24px; line-height: 1.2; margin: 2px 0; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+  .tile.warn b { color: var(--run); }
+  .reality p { margin: 6px 0; }
+  .caret::after { content: ""; display: inline-block; width: 8px; height: 1em; vertical-align: -2px; margin-left: 2px; background: var(--brand); animation: blink 1s steps(1) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+  .typing { display: inline-flex; gap: 4px; padding: 6px 0; }
+  .typing i { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); animation: bounce 1.2s infinite; }
+  .typing i:nth-child(2) { animation-delay: .15s; } .typing i:nth-child(3) { animation-delay: .3s; }
+  @keyframes bounce { 0%, 60%, 100% { transform: none; opacity: .4; } 30% { transform: translateY(-4px); opacity: 1; } }
+  .err-box { border-left: 3px solid var(--err); padding: 8px 12px; background: color-mix(in srgb, var(--err) 8%, transparent); border-radius: 0 8px 8px 0; }
+  .actions { display: flex; gap: 6px; margin-top: 10px; }
+  .act { border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 4px 10px; font-size: 13px; color: var(--muted); display: inline-flex; gap: 6px; align-items: center; }
+  .act:hover { color: var(--ink); border-color: var(--muted); }
+
+  /* ---------- Empty state ---------- */
+  .empty { max-width: 640px; margin: 8vh auto 0; }
+  .empty h1 { font-size: clamp(28px, 4vw, 40px); line-height: 1.15; margin: 0 0 10px; letter-spacing: -0.02em; }
+  .empty p { color: var(--muted); margin: 0 0 22px; max-width: 54ch; }
+  .crew { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 28px; }
+  .crew span { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; padding: 4px 10px 4px 6px; border-radius: 99px; background: color-mix(in srgb, var(--c) 12%, transparent); color: var(--c); font-weight: 600; }
+  .ideas { display: grid; gap: 10px; }
+  .idea { text-align: left; border: 1px solid var(--line); background: var(--surface); border-radius: 12px; padding: 12px 14px; }
+  .idea:hover { border-color: var(--brand); }
+  .idea small { display: block; color: var(--muted); font-size: 13px; }
+
+  /* ---------- Composer ---------- */
+  .composer-wrap { padding: 0 24px 18px; }
+  .composer { max-width: 760px; margin: 0 auto; display: flex; align-items: flex-end; gap: 8px; background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 8px 8px 8px 16px; box-shadow: 0 6px 24px -12px color-mix(in srgb, var(--ink) 30%, transparent); }
+  .composer:focus-within { border-color: var(--brand); }
+  #input { flex: 1; border: 0; resize: none; background: none; color: var(--ink); font: inherit; padding: 6px 0; max-height: 200px; outline: none; overflow-y: hidden; }
+  #send { width: 38px; height: 38px; border-radius: 12px; border: 0; background: var(--brand); color: var(--surface); display: grid; place-items: center; }
+  #send:disabled { opacity: .35; cursor: default; }
+  .hint { max-width: 760px; margin: 6px auto 0; font-size: 12px; color: var(--muted); text-align: center; }
+  #jump { position: absolute; left: 50%; bottom: 96px; transform: translateX(-50%); border: 1px solid var(--line); background: var(--surface); border-radius: 99px; padding: 4px 12px; font-size: 13px; display: none; box-shadow: 0 4px 14px -6px color-mix(in srgb, var(--ink) 40%, transparent); }
+  #jump.show { display: block; }
+  .scrim { display: none; }
+
+  /* ---------- Quick replies ---------- */
+  .choices { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .choice { border: 1px solid color-mix(in srgb, var(--brand) 45%, var(--line)); background: var(--surface); color: var(--brand); border-radius: 99px; padding: 6px 14px; font-size: 14px; font-weight: 500; }
+  .choice:hover { background: var(--brand); color: var(--surface); }
+
+  /* ---------- Plan cards ---------- */
+  .plan { margin-top: 22px; display: grid; gap: 18px; }
+  .hero { position: relative; border-radius: var(--radius); overflow: hidden; min-height: 170px; background: linear-gradient(135deg, var(--brand), color-mix(in srgb, var(--brand) 40%, var(--a-activities))); color: #fff; display: flex; align-items: flex-end; }
+  .hero img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .hero::after { content: ""; position: absolute; inset: 0; background: linear-gradient(transparent 30%, rgba(8, 20, 35, .75)); }
+  .hero-in { position: relative; z-index: 1; padding: 18px; width: 100%; display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px; }
+  .hero h3 { margin: 0; font-size: 24px; line-height: 1.2; letter-spacing: -0.01em; }
+  .hero p { margin: 2px 0 0; opacity: .9; font-size: 14px; }
+  .hero .links a, .hero .links button { background: rgba(255,255,255,.16); border-color: rgba(255,255,255,.35); color: #fff; backdrop-filter: blur(6px); }
+  .block h4 { margin: 0 0 10px; font-size: 16px; display: flex; align-items: center; gap: 8px; }
+  .block h4 svg { color: var(--c, var(--brand)); }
+  .links { display: flex; flex-wrap: wrap; gap: 8px; }
+  .links a, .links button { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 500; text-decoration: none; color: var(--brand); border: 1px solid var(--line); background: var(--surface); padding: 5px 11px; border-radius: 8px; }
+  .links a:hover, .links button:hover { border-color: var(--brand); }
+  .legs { list-style: none; margin: 0 0 12px; padding: 0; display: grid; gap: 2px; }
+  .leg { display: grid; grid-template-columns: 54px 1fr auto; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
+  .leg:last-child { border-bottom: 0; }
+  .leg-time { font-variant-numeric: tabular-nums; font-weight: 600; }
+  .leg-time small { display: block; color: var(--muted); font-weight: 400; }
+  .leg-what small { display: block; color: var(--muted); font-size: 13px; }
+  .leg-cost { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .leg-dir { font-size: 12.5px; color: var(--muted); margin: 10px 0 2px; font-weight: 600; }
+  .map { width: 100%; height: 260px; border: 0; border-radius: 12px; background: var(--line); margin-bottom: 10px; }
+  .map-note { font-size: 12px; color: var(--muted); margin: -4px 0 10px; }
+  .stays { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
+  .stay { border: 1px solid var(--line); background: var(--surface); border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 6px; }
+  .stay.top { border-color: var(--a-stays); box-shadow: inset 0 0 0 1px var(--a-stays); }
+  .stay .tag { align-self: flex-start; font-size: 12px; font-weight: 600; color: var(--a-stays); }
+  .stay b { font-size: 15px; line-height: 1.3; }
+  .stay .where { font-size: 13px; color: var(--muted); }
+  .stay .why { font-size: 13.5px; flex: 1; }
+  .stay .price { font-variant-numeric: tabular-nums; font-size: 14px; }
+  .stay .price small { color: var(--muted); }
+  .places { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
+  .place { text-decoration: none; color: inherit; border-radius: 12px; overflow: hidden; background: var(--surface); border: 1px solid var(--line); display: flex; flex-direction: column; }
+  .place:hover { border-color: var(--a-activities); }
+  .place .ph { aspect-ratio: 4 / 3; background: color-mix(in srgb, var(--a-activities) 14%, var(--paper)); display: grid; place-items: center; color: var(--a-activities); overflow: hidden; }
+  .place .ph img { width: 100%; height: 100%; object-fit: cover; }
+  .place span { padding: 8px 10px 10px; font-size: 13.5px; font-weight: 600; line-height: 1.3; }
+  .place small { display: block; font-weight: 400; color: var(--muted); font-size: 12px; }
+  .insider h5 { margin: 12px 0 6px; font-size: 13.5px; color: var(--muted); font-weight: 600; }
+  .insider ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 14px; }
+  .insider a { color: var(--brand); text-decoration: none; font-weight: 600; }
+  .insider small { color: var(--muted); }
+  .known { display: flex; flex-wrap: wrap; gap: 6px; }
+  .known span { background: color-mix(in srgb, var(--a-local) 14%, transparent); color: var(--ink); border-radius: 99px; padding: 4px 11px; font-size: 13px; cursor: help; }
+  .insider-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 4px 24px; }
+  .tight { margin-top: 14px; border-left: 3px solid var(--a-local); padding: 2px 0 2px 12px; }
+  .tight p { margin: 0 0 6px; font-size: 14px; }
+  .eat { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+  .eat li { font-size: 14px; }
+  .eat a { color: var(--brand); font-weight: 600; text-decoration: none; }
+  .eat small { color: var(--muted); }
+
+  /* ---------- Trip brief (live intake card) ---------- */
+  .brief .head { display: flex; align-items: center; gap: 10px; padding: 10px 14px; font-weight: 500; }
+  .brief .rows { list-style: none; margin: 0; padding: 2px 14px 12px; display: grid; gap: 2px; }
+  .brief .row { display: grid; grid-template-columns: 22px 120px 1fr; gap: 10px; align-items: baseline; font-size: 14px; padding: 4px 0; }
+  .brief .row .tick { color: var(--ok); align-self: center; }
+  .brief .row .k { color: var(--muted); }
+  .brief .row .v { overflow-wrap: anywhere; }
+  .brief .row.next .tick { width: 12px; height: 12px; border-radius: 50%; border: 2px dashed var(--run); margin-left: 2px; }
+  .brief .row.next .v { color: var(--run); font-weight: 500; }
+  .brief.thinking .row.next .v { color: var(--muted); }
+  .row.fresh { animation: rowIn .35s ease-out; }
+  @keyframes rowIn { from { opacity: 0; transform: translateY(4px); } }
+
+  /* ---------- Answer card (docked question) ---------- */
+  .ask { max-width: 760px; margin: 0 auto; background: var(--surface); border: 1px solid color-mix(in srgb, var(--brand) 40%, var(--line)); border-radius: 18px; padding: 16px 18px 14px; box-shadow: 0 10px 30px -14px color-mix(in srgb, var(--ink) 45%, transparent); animation: askIn .25s ease-out; }
+  @keyframes askIn { from { opacity: 0; transform: translateY(10px); } }
+  .ask-top { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--muted); margin-bottom: 4px; }
+  .ask-top .orb { background: var(--run); animation: breathe 1.2s ease-in-out infinite; }
+  .ask h3 { margin: 0 0 12px; font-size: 17px; line-height: 1.35; font-weight: 600; }
+  .opts { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+  .opt { border: 1px solid var(--line); background: var(--paper); border-radius: 10px; padding: 7px 12px; font-size: 14px; display: inline-flex; align-items: center; gap: 8px; }
+  .opt:hover { border-color: var(--brand); }
+  .opt .box { width: 15px; height: 15px; border-radius: 4px; border: 1.5px solid var(--muted); display: grid; place-items: center; }
+  .opt.single .box { border-radius: 50%; }
+  .opt[aria-pressed="true"] { border-color: var(--brand); background: var(--brand-soft); color: var(--ink); }
+  .opt[aria-pressed="true"] .box { background: var(--brand); border-color: var(--brand); }
+  .opt[aria-pressed="true"] .box::after { content: ""; width: 7px; height: 4px; border: 2px solid var(--surface); border-top: 0; border-right: 0; transform: rotate(-45deg) translate(1px, -1px); }
+  .ask-fields { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+  .ask-fields label { display: grid; gap: 4px; font-size: 12.5px; color: var(--muted); flex: 1; min-width: 140px; }
+  .ask input, .ask select { font: inherit; font-size: 14px; color: var(--ink); background: var(--paper); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; width: 100%; }
+  .ask input:focus, .ask select:focus { outline: none; border-color: var(--brand); }
+  .ask-foot { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .ask-foot .grow { flex: 1; }
+  .btn { border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 7px 14px; font-size: 14px; font-weight: 500; }
+  .btn.primary { background: var(--brand); border-color: var(--brand); color: var(--surface); }
+  .btn.primary:disabled { opacity: .4; cursor: default; }
+  .linkish { border: 0; background: none; color: var(--muted); font-size: 13px; padding: 4px; text-decoration: underline; text-underline-offset: 2px; }
+  body.asking .composer, body.asking .hint { display: none; }
+
+  @media (max-width: 760px) {
+    .side { position: fixed; inset: 0 auto 0 0; transform: translateX(-100%); transition: transform .25s; box-shadow: 0 0 40px rgba(0,0,0,.25); }
+    body.nav-open .side { transform: none; }
+    body.nav-open .scrim { display: block; position: fixed; inset: 0; background: rgba(0,0,0,.35); z-index: 10; }
+    .top { display: flex; }
+    #chat { padding: 20px 16px; }
+    .composer-wrap { padding: 0 16px 12px; }
+    .turn.bot { grid-template-columns: 1fr; }
+    .avatar { display: none; }
+    .s-del { opacity: 1; }
+    .s-open { padding-right: 70px; }
+    .collage { height: 220px; }
+    .answer td:first-child { white-space: normal; }
+    .answer table { display: block; overflow-x: auto; }
+    .brief .row { grid-template-columns: 22px 1fr; }
+    .brief .row .v { grid-column: 2; }
+    #input::placeholder { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+    .shimmer { color: var(--ink); background: none; }
+  }
+</style>
+</head>
+<body>
+<aside class="side" aria-label="Trips">
+  <div class="brand">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m16.2 7.8-2.1 6.3-6.3 2.1 2.1-6.3z"/></svg>
+    Travel Team
+  </div>
+  <button class="new" id="newBtn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>New trip</button>
+  <div class="list-head">Your trips</div>
+  <ul id="sessions"></ul>
+</aside>
+<div class="scrim" id="scrim"></div>
+<main>
+  <div class="top">
+    <button class="icon-btn" id="menuBtn" aria-label="Open trips"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
+    <span class="title" id="topTitle">Travel Team</span>
+  </div>
+  <div id="chat" aria-live="polite"></div>
+  <button id="jump">Jump to latest</button>
+  <div class="composer-wrap">
+    <section class="ask" id="ask" hidden aria-live="polite" aria-label="Question from your travel adviser"></section>
+    <form class="composer" id="form">
+      <textarea id="input" rows="1" placeholder="Where do you want to go? Add dates, budget and where you're leaving from." aria-label="Message"></textarea>
+      <button id="send" aria-label="Send" disabled><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button>
+    </form>
+    <div class="hint">Prices are estimates from the AI, not live quotes.</div>
+  </div>
+</main>
+<script>
+const $ = (s, r = document) => r.querySelector(s);
+const chat = $("#chat");
+let current = null;
+let sending = false;
+
+const ICON = {
+  planner: '<circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5z"/>',
+  composer: '<path d="M4 20h4l10-10-4-4L4 16z"/><path d="m13.5 6.5 4 4"/>',
+  transport: '<path d="M10.5 21 12 14l-7-3 1-2 7 1.5L17 4c1-1 2.5-1 3 0s0 2-1 3l-6 3.5 1.5 7-2 1-3-6.5z"/>',
+  flights: '<path d="M10.5 21 12 14l-7-3 1-2 7 1.5L17 4c1-1 2.5-1 3 0s0 2-1 3l-6 3.5 1.5 7-2 1-3-6.5z"/>',
+  stays: '<path d="M3 18V8M3 14h18v4M21 14v-2a3 3 0 0 0-3-3h-7v5"/><circle cx="7" cy="11" r="2"/>',
+  activities: '<path d="M12 21s-7-5.5-7-11a7 7 0 0 1 14 0c0 5.5-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/>',
+  local: '<path d="m12 3 2.6 5.6 6.1.7-4.5 4.2 1.2 6L12 16.6 6.6 19.5l1.2-6-4.5-4.2 6.1-.7z"/>',
+};
+const icon = (k, size = 16) => `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[k]}</svg>`;
+const CHECK = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>';
+const CROSS = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>';
+
+// Who each agent is, and what it says while it works (rotates every few seconds).
+const AGENTS = {
+  planner:    { name: "Orchestrator", color: "--a-planner", work: ["Reading your request", "Working out dates and budget", "Briefing the team"] },
+  transport:  { name: "Transport agent", color: "--a-flights", work: ["Mapping your route", "Comparing fares and timings", "Checking transfers"] },
+  flights:    { name: "Flight agent", color: "--a-flights", work: ["Checking routes", "Comparing fares", "Weighing stops and timings"] },
+  stays:      { name: "Stay agent", color: "--a-stays", work: ["Scouting neighbourhoods", "Comparing nightly rates", "Shortlisting places to stay"] },
+  activities: { name: "Activity agent", color: "--a-activities", work: ["Mapping the sights", "Finding local food", "Drafting day plans"] },
+  local:      { name: "Local expert", color: "--a-local", work: ["Recalling local favourites", "Checking events on your dates", "Finding hidden gems", "Sanity-checking the budget"] },
+  composer:   { name: "Orchestrator", color: "--a-planner", work: ["Putting your plan together", "Balancing the budget", "Writing it up"] },
+};
+const ORDER = ["planner", "transport", "flights", "stays", "activities", "local", "composer"];
+const WORKERS = ["transport", "flights", "stays", "activities", "local"];
+
+const md = (t) => DOMPurify.sanitize(marked.parse(t || ""));
+const esc = (t) => String(t ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+const secs = (ms) => (ms < 60000 ? `${Math.max(1, Math.round(ms / 1000))}s` : `${Math.floor(ms / 60000)}m ${Math.round((ms % 60000) / 1000)}s`);
+const money = (n) => (typeof n === "number" && isFinite(n) ? Math.round(n).toLocaleString() : null);
+const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+function ago(t) {
+  const d = (Date.now() - t) / 1000;
+  if (!t || isNaN(d)) return "";
+  if (d < 60) return "just now";
+  if (d < 3600) return `${Math.floor(d / 60)} min ago`;
+  if (d < 86400) return `${Math.floor(d / 3600)} h ago`;
+  return new Date(t).toLocaleDateString(undefined, { day: "numeric", month: "short" });
+}
+
+async function api(path, opts) {
+  const r = await fetch(path, { headers: { "Content-Type": "application/json" }, ...opts });
+  if (!r.ok && r.status !== 204) throw new Error((await r.json().catch(() => ({}))).error || `Request failed (${r.status})`);
+  return r.status === 204 ? null : r.json();
+}
+
+// ---------- Scrolling: follow new content only while the reader is at the bottom ----------
+let stick = true;
+chat.addEventListener("scroll", () => {
+  stick = chat.scrollHeight - chat.scrollTop - chat.clientHeight < 80;
+  $("#jump").classList.toggle("show", !stick);
+});
+const follow = () => { if (stick) chat.scrollTop = chat.scrollHeight; };
+$("#jump").onclick = () => { stick = true; chat.scrollTo({ top: chat.scrollHeight, behavior: reduced ? "auto" : "smooth" }); };
+
+// ---------- Sidebar ----------
+async function loadSessions() {
+  const list = await api("/api/sessions");
+  $("#sessions").innerHTML = list.map((s) => `
+    <li data-id="${esc(s.id)}" class="${s.id === current ? "active" : ""}">
+      <button class="s-open"><span class="s-title">${esc(s.title)}</span><span class="s-time">${ago(s.updatedAt)}</span></button>
+      <button class="s-del" aria-label="Delete trip">Delete</button>
+    </li>`).join("");
+  const active = list.find((s) => s.id === current);
+  $("#topTitle").textContent = active ? active.title : "Travel Team";
+  return list;
+}
+
+$("#sessions").onclick = async (e) => {
+  const li = e.target.closest("li");
+  if (!li) return;
+  const del = e.target.closest(".s-del");
+  if (!del) return openSession(li.dataset.id);
+  // Two-step delete: first click arms, second click (within 3s) deletes.
+  if (!del.classList.contains("confirm")) {
+    del.classList.add("confirm"); del.textContent = "Confirm";
+    setTimeout(() => { del.classList.remove("confirm"); del.textContent = "Delete"; }, 3000);
+    return;
+  }
+  try {
+    await api(`/api/sessions/${li.dataset.id}`, { method: "DELETE" });
+    if (li.dataset.id === current) { current = null; renderEmpty(); }
+    loadSessions();
+  } catch (err) { del.textContent = "Busy"; }
+};
+
+$("#newBtn").onclick = () => { hideAsk(); brief = null; current = null; localStorage.removeItem("session"); renderEmpty(); loadSessions(); closeNav(); $("#input").focus(); };
+$("#menuBtn").onclick = () => document.body.classList.add("nav-open");
+const closeNav = () => document.body.classList.remove("nav-open");
+$("#scrim").onclick = closeNav;
+
+// ---------- Rendering ----------
+const IDEAS = [
+  ["A long weekend in Goa", "From Pune, 12–15 Dec, ₹60,000 for 2, beaches and seafood"],
+  ["Forts and food in Jaipur", "From Mumbai, 5–7 Jan, ₹50,000 for 2"],
+  ["First trip to Tokyo", "From Delhi, 10–16 Apr, ₹2,50,000 for 1, anime and ramen"],
+];
+
+function renderEmpty() {
+  $("#topTitle").textContent = "Travel Team";
+  chat.innerHTML = `<section class="empty">
+    <h1>Where to next?</h1>
+    <p>Tell me where you want to go, your dates, budget and starting city. Five agents split the work and hand you one plan you can keep refining in this chat.</p>
+    <div class="crew">
+      ${["planner", "transport", "stays", "activities", "local"].map((k) => `<span style="--c:var(${AGENTS[k].color})">${icon(k, 14)}${AGENTS[k].name}</span>`).join("")}
+    </div>
+    <div class="ideas">${IDEAS.map(([t, d]) => `<button class="idea" data-q="${esc(`Plan ${t.toLowerCase()}: ${d}`)}">${esc(t)}<small>${esc(d)}</small></button>`).join("")}</div>
+  </section>`;
+  chat.querySelectorAll(".idea").forEach((b) => b.onclick = () => send(b.dataset.q));
+}
+
+async function openSession(id) {
+  current = id;
+  localStorage.setItem("session", id);
+  closeNav();
+  await loadSessions();
+  const s = await api(`/api/sessions/${id}`).catch(() => null);
+  if (!s) { current = null; return renderEmpty(); }
+  chat.innerHTML = "";
+  if (!s.log.length) renderEmpty();
+  hideAsk();
+  brief = null;
+  let lastAsk = null;
+  for (const m of s.log) {
+    if (m.role === "user") { if (!m.answer || !brief) addUser(m.text); continue; }
+    if (m.ask && !m.plan) {
+      if (m.text) new Turn().finish(m.text, false);
+      (brief ??= new Brief()).update(m.profile, m.ask);
+      lastAsk = m.ask;
+      continue;
+    }
+    lastAsk = null;
+    if (brief) { brief.complete(m.profile); brief = null; }
+    const t = new Turn();
+    (m.agents || []).forEach((e) => t.event(e));
+    m.text.startsWith("Error:") ? t.fail(m.text.slice(7)) : t.finish(m.text, false, { plan: m.plan });
+    if (m.plan && m.ask) lastAsk = m.ask;
+  }
+  if (lastAsk) showAsk(lastAsk);
+  stick = true; chat.scrollTop = chat.scrollHeight;
+}
+
+function addUser(text) {
+  $(".empty")?.remove();
+  chat.insertAdjacentHTML("beforeend", `<div class="turn user"><div class="bubble">${esc(text)}</div></div>`);
+  follow();
+}
+
+// ---------- Trip brief: the orchestrator stays live while it gathers details ----------
+let brief = null;
+const TICK = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>';
+class Brief {
+  constructor() {
+    this.el = document.createElement("article");
+    this.el.className = "turn bot";
+    this.el.innerHTML = `<div class="avatar">${icon("planner", 18)}</div>
+      <div class="bot-body"><div class="team brief live">
+        <div class="head"><span class="orb"></span><span class="label">Building your trip brief</span></div>
+        <ul class="rows"></ul></div></div>`;
+    this.panel = $(".team", this.el);
+    this.rows = $(".rows", this.el);
+    this.known = new Set();
+    this.profile = [];
+    chat.append(this.el);
+  }
+  label(t, shimmer = false) { const l = $(".label", this.el); l.textContent = t; l.classList.toggle("shimmer", shimmer); }
+  paint(profile = [], next) {
+    this.rows.innerHTML = profile.map((r) => `<li class="row${this.known.has(r.label) ? "" : " fresh"}"><span class="tick">${TICK}</span><span class="k">${esc(r.label)}</span><span class="v">${esc(r.value)}</span></li>`).join("")
+      + (next ? `<li class="row next"><span class="tick"></span><span class="k">${esc(next.label)}</span><span class="v">${esc(next.text)}</span></li>` : "");
+    profile.forEach((r) => this.known.add(r.label));
+  }
+  update(profile, ask) {
+    this.profile = profile || this.profile;
+    this.ask = ask;
+    this.panel.classList.add("live"); this.panel.classList.remove("thinking");
+    this.label("Waiting for your answer");
+    this.paint(this.profile, { label: ask.label, text: "Your answer" });
+    chat.append(this.el); // keep the live brief at the bottom of the conversation
+    follow();
+  }
+  thinking(answerText) {
+    this.panel.classList.add("thinking");
+    this.label("Reading your answer", true);
+    this.paint(this.profile, { label: this.ask?.label || "Answer", text: answerText });
+    follow();
+  }
+  complete(profile) {
+    this.paint(profile || this.profile);
+    this.panel.classList.remove("live", "thinking");
+    this.label("Trip brief complete");
+  }
+}
+
+// ---------- Answer card: one question at a time, docked where the message box is ----------
+let askState = null;
+const CURRENCIES = ["INR", "USD", "EUR", "GBP", "AED", "SGD", "AUD", "CAD", "JPY"];
+function hideAsk() { askState = null; $("#ask").hidden = true; $("#ask").innerHTML = ""; document.body.classList.remove("asking"); }
+function showAsk(ask) {
+  askState = { ask, picked: new Set() };
+  const el = $("#ask");
+  const today = new Date().toISOString().slice(0, 10);
+  const opts = ask.options?.length ? `<div class="opts" role="group">${ask.options.map((o) =>
+    `<button type="button" class="opt${ask.multi ? "" : " single"}" aria-pressed="false" data-v="${esc(o)}"><span class="box"></span>${esc(o)}</button>`).join("")}</div>` : "";
+  let fields;
+  if (ask.type === "dates") fields = `<div class="ask-fields"><label>Leaving<input type="date" name="from" min="${today}"></label><label>Coming back<input type="date" name="to" min="${today}"></label></div>`;
+  else if (ask.type === "budget") fields = `<div class="ask-fields"><label>Budget<input type="number" name="amount" min="1" step="500" inputmode="numeric" placeholder="e.g. 6000"></label>
+      <label>For<select name="basis"><option value="">Choose</option><option value="per person">Per person</option><option value="for the whole group">Whole group</option></select></label>
+      <label>Currency<select name="currency"><option value="">Choose</option>${CURRENCIES.map((c) => `<option>${c}</option>`).join("")}</select></label></div>`;
+  else fields = `<div class="ask-fields"><label>${ask.options?.length ? "Or tell me in your own words" : "Your answer"}<input type="text" name="text" placeholder="${esc(ask.placeholder || "")}" autocomplete="off"></label></div>`;
+  el.innerHTML = `<div class="ask-top"><span class="orb"></span>${esc(ask.label)}${ask.multi ? ", pick all that apply" : ""}</div>
+    <h3>${esc(ask.question)}</h3>${opts}${fields}
+    <div class="ask-foot"><button type="button" class="linkish" data-act="chat">Ask something instead</button><span class="grow"></span>
+      ${ask.optional ? `<button type="button" class="btn" data-act="skip">Skip</button>` : ""}
+      <button type="button" class="btn primary" data-act="send" disabled>Continue</button></div>`;
+  el.hidden = false;
+  document.body.classList.add("asking");
+  const sendBtn = $('[data-act="send"]', el);
+  const value = () => {
+    const f = (n) => $(`[name="${n}"]`, el)?.value.trim() || "";
+    if (ask.type === "dates") return f("from") && f("to") && f("to") >= f("from") ? `From ${f("from")} to ${f("to")}` : "";
+    if (ask.type === "budget") return Number(f("amount")) > 0 && f("currency") && f("basis") ? `${f("amount")} ${f("currency")} ${f("basis")}` : "";
+    return [[...(askState?.picked || [])].join(" and "), f("text")].filter(Boolean).join(", ");
+  };
+  const refresh = () => { sendBtn.disabled = !value(); };
+  el.querySelectorAll(".opt").forEach((b) => b.onclick = () => {
+    const v = b.dataset.v;
+    if (!ask.multi) return answer(v); // single choice answers straight away
+    askState.picked.has(v) ? askState.picked.delete(v) : askState.picked.add(v);
+    b.setAttribute("aria-pressed", askState.picked.has(v));
+    refresh();
+  });
+  el.querySelectorAll("input, select").forEach((i) => {
+    i.oninput = refresh; i.onchange = refresh;
+    i.onkeydown = (e) => { if (e.key === "Enter" && !sendBtn.disabled) { e.preventDefault(); answer(value()); } };
+  });
+  sendBtn.onclick = () => answer(value());
+  $('[data-act="skip"]', el)?.addEventListener("click", () => answer("Skip", { skip: true }));
+  $('[data-act="chat"]', el).onclick = () => { hideAsk(); input.focus(); };
+  (el.querySelector("input") || el.querySelector(".opt"))?.focus({ preventScroll: true });
+  follow();
+}
+function answer(text, { skip = false } = {}) {
+  if (!text || sending) return;
+  send(text, { asAnswer: true, skip });
+}
+
+// One assistant turn: the live team panel plus the answer.
+class Turn {
+  constructor() {
+    this.el = document.createElement("article");
+    this.el.className = "turn bot";
+    this.el.innerHTML = `<div class="avatar">${icon("planner", 18)}</div>
+      <div class="bot-body">
+        <details class="team live" open hidden>
+          <summary><span class="orb"></span><span class="label shimmer">Starting your travel team</span><span class="clock"></span>
+            <svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg></summary>
+          <ol class="route"></ol>
+        </details>
+        <div class="answer"><span class="typing" aria-label="Working"><i></i><i></i><i></i></span></div>
+      </div>`;
+    chat.append(this.el);
+    this.team = $(".team", this.el);
+    this.route = $(".route", this.el);
+    this.answer = $(".answer", this.el);
+    this.steps = {};
+    this.start = null;
+    this.end = null;
+    follow();
+  }
+
+  step(key) {
+    if (this.steps[key]) return this.steps[key];
+    const a = AGENTS[key] || { name: key, color: "--a-planner", work: ["Working"] };
+    const li = document.createElement("li");
+    li.className = "step queued" + (WORKERS.includes(key) ? " parallel" : "");
+    li.style.setProperty("--c", `var(${a.color})`);
+    li.innerHTML = `<span class="node">${icon(key)}</span>
+      <div><div class="s-name">${a.name}</div><div class="s-status">Waiting for the brief</div><div class="s-pick"></div></div>
+      <div class="s-meta"><div class="s-cost"></div><div class="s-time"></div></div>
+      <pre class="peek"></pre>`;
+    // Keep the route in pipeline order even if events arrive out of order.
+    const after = ORDER.indexOf(key);
+    const next = [...this.route.children].find((c) => ORDER.indexOf(c.dataset.key) > after);
+    li.dataset.key = key;
+    this.route.insertBefore(li, next || null);
+    this.team.hidden = false;
+    return (this.steps[key] = { li, a, started: null, ended: null, tick: 0, runs: 0 });
+  }
+
+  event(e) {
+    // Live turns use the browser clock (no server/client skew); replays use saved server times.
+    const at = this.isLive ? Date.now() : e.at || Date.now();
+    this.start ??= at;
+    const s = this.step(e.agent);
+    const status = $(".s-status", s.li);
+    if (e.type === "agent_start") {
+      s.runs++;
+      s.started = at; s.ended = null;
+      s.li.className = s.li.className.replace(/queued|done|error/g, "").trim() + " running";
+      s.li.querySelector(".node").innerHTML = icon(e.agent);
+      status.textContent = s.runs > 1 ? "Over budget, looking for something cheaper" : s.a.work[0];
+      if (e.input) this.setPeek(s, `Brief\n${JSON.stringify(e.input, null, 2)}`);
+      if (e.input?.budget) $(".s-cost", s.li).textContent = `Budget ${money(e.input.budget)}`;
+      this.label(`${s.a.name}: ${status.textContent.toLowerCase()}`);
+    } else if (e.type === "agent_done") {
+      s.ended = at;
+      s.li.className = s.li.className.replace("running", "done");
+      s.li.querySelector(".node").innerHTML = CHECK;
+      const r = e.result || {};
+      if (e.agent === "planner") {
+        const run = Array.isArray(r.run) ? r.run : [];
+        status.textContent = r.action === "plan" ? `Briefed ${run.length} agent${run.length === 1 ? "" : "s"}` : r.action === "ask" ? "Needs a few more details" : "Answered directly";
+        if (r.action === "plan") run.forEach((k) => AGENTS[k] && this.step(k));
+      } else if (e.agent === "composer") {
+        status.textContent = "Plan ready";
+      } else {
+        status.textContent = r.summary ? r.summary.split(/(?<=\.)\s/)[0] : "Done";
+        const pick = r.headline || r.recommended?.title;
+        if (pick) $(".s-pick", s.li).innerHTML = `Pick: <b>${esc(pick)}</b>`;
+        if (money(r.est_total)) $(".s-cost", s.li).textContent = `est. ${money(r.est_total)}`;
+        this.setPeek(s, `Result\n${JSON.stringify(r, null, 2)}`, true);
+      }
+    } else if (e.type === "agent_error") {
+      s.ended = at;
+      s.li.className = s.li.className.replace("running", "error");
+      s.li.querySelector(".node").innerHTML = CROSS;
+      status.textContent = `Couldn't finish: ${e.error}`;
+    }
+    this.paintTimes();
+    follow();
+  }
+
+  setPeek(s, text, append) {
+    const pre = $(".peek", s.li);
+    pre.textContent = append && pre.textContent ? `${pre.textContent}\n\n${text}` : text;
+    if (!$(".peek-btn", s.li)) {
+      const b = document.createElement("button");
+      b.className = "peek-btn"; b.textContent = "Details";
+      b.onclick = () => { s.li.classList.toggle("show-peek"); b.textContent = s.li.classList.contains("show-peek") ? "Hide details" : "Details"; };
+      $(".s-meta", s.li).append(b);
+    }
+  }
+
+  label(text) { $(".label", this.team).textContent = text; }
+
+  paintTimes(now = Date.now()) {
+    for (const s of Object.values(this.steps)) {
+      if (s.started) $(".s-time", s.li).textContent = secs((s.ended || now) - s.started);
+    }
+    if (this.start) $(".clock", this.team).textContent = secs((this.end || now) - this.start);
+  }
+
+  // Live ticking: timers advance and each running agent rotates its status line.
+  live() {
+    this.isLive = true;
+    let beat = 0;
+    this.timer = setInterval(() => {
+      beat++;
+      this.paintTimes();
+      for (const [k, s] of Object.entries(this.steps)) {
+        if (!s.li.classList.contains("running") || s.runs > 1) continue;
+        if (beat % 3 === 0) {
+          s.tick = (s.tick + 1) % s.a.work.length;
+          $(".s-status", s.li).textContent = s.a.work[s.tick];
+        }
+      }
+      const running = Object.values(this.steps).filter((s) => s.li.classList.contains("running"));
+      if (running.length > 1) this.label(`${running.length} agents working in parallel`);
+      else if (running.length === 1) this.label(`${running[0].a.name}: ${$(".s-status", running[0].li).textContent.toLowerCase()}`);
+    }, 1000);
+  }
+
+  settle(ok) {
+    clearInterval(this.timer);
+    this.end = Math.max(...Object.values(this.steps).map((s) => s.ended || s.started || 0), this.start || 0) || null;
+    this.paintTimes(this.end || Date.now());
+    const label = $(".label", this.team);
+    label.classList.remove("shimmer");
+    this.team.classList.remove("live");
+    if (!ok) this.team.classList.add("failed");
+    const workers = Object.keys(this.steps).filter((k) => WORKERS.includes(k)).length;
+    const took = this.start && this.end ? ` in ${secs(this.end - this.start)}` : "";
+    label.textContent = !ok ? `Stopped${took}` : workers ? `Planned with ${workers} agent${workers === 1 ? "" : "s"}${took}` : `Checked your request${took}`;
+    $(".clock", this.team).textContent = "";
+    this.team.open = false;
+  }
+
+  finish(text, animate = true, extra = {}) {
+    this.settle(true);
+    this.text = text;
+    if (extra.plan) this.answer.before(renderHeader(extra.plan));
+    // Plan cards, actions and quick replies appear once the text has finished revealing.
+    const after = () => {
+      if (extra.plan) { $(".bot-body", this.el).append(renderPlan(extra.plan)); this.addActions(); }
+      if (extra.plan && extra.ask) showAsk(extra.ask); // follow-up question once the plan is on screen
+      if (extra.choices?.length) {
+        const row = document.createElement("div");
+        row.className = "choices";
+        for (const c of extra.choices) {
+          const b = document.createElement("button");
+          b.className = "choice"; b.textContent = c;
+          b.onclick = () => send(c);
+          row.append(b);
+        }
+        $(".bot-body", this.el).append(row);
+      }
+      follow();
+    };
+    if (!animate || reduced) { this.answer.innerHTML = md(text); return after(); }
+    // Word-by-word reveal, capped at ~1.6s however long the plan is.
+    const parts = text.split(/(\s+)/);
+    const per = Math.max(2, Math.ceil(parts.length / 90));
+    let i = 0;
+    this.answer.classList.add("caret");
+    const tick = () => {
+      i = Math.min(parts.length, i + per);
+      this.answer.innerHTML = md(parts.slice(0, i).join(""));
+      follow();
+      if (i < parts.length) setTimeout(tick, 18);
+      else { this.answer.classList.remove("caret"); after(); }
+    };
+    tick();
+  }
+
+  fail(message, retry) {
+    this.settle(false);
+    this.answer.innerHTML = `<div class="err-box">${esc(message)}</div>`;
+    if (retry) {
+      const b = document.createElement("button");
+      b.className = "act"; b.textContent = "Try again";
+      b.onclick = () => { this.el.remove(); retry(); };
+      const row = document.createElement("div"); row.className = "actions"; row.append(b);
+      $(".bot-body", this.el).append(row);
+    }
+    follow();
+  }
+
+  addActions() {
+    const row = document.createElement("div");
+    row.className = "actions";
+    row.innerHTML = `<button class="act">Copy plan</button><button class="act" title="Every agent's system prompt, role and brief for this trip">Copy master prompt</button>`;
+    const [b, mp] = row.children;
+    const flash = (btn, text, back) => { btn.textContent = text; setTimeout(() => (btn.textContent = back), 1600); };
+    b.onclick = async () => {
+      try { await navigator.clipboard.writeText(this.text); flash(b, "Copied", "Copy plan"); }
+      catch { flash(b, "Copy failed", "Copy plan"); }
+    };
+    mp.onclick = async () => {
+      const sessionId = current;
+      mp.textContent = "Preparing…";
+      const text = fetch(`/api/sessions/${sessionId}/master-prompt`).then(async (r) => {
+        if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || r.statusText);
+        return r.text();
+      });
+      try {
+        // ClipboardItem with a promise keeps the click's permission while the prompt downloads.
+        if (window.ClipboardItem) await navigator.clipboard.write([new ClipboardItem({ "text/plain": text.then((t) => new Blob([t], { type: "text/plain" })) })]);
+        else await navigator.clipboard.writeText(await text);
+        flash(mp, "Copied", "Copy master prompt");
+      } catch { flash(mp, "Copy failed", "Copy master prompt"); }
+    };
+    $(".bot-body", this.el).append(row);
+  }
+}
+
+// ---------- Plan cards: route, stays, places, food, calendar ----------
+// Every link is built here from the agents' structured data; the LLM never writes URLs.
+const enc = encodeURIComponent;
+const mapsSearch = (q) => `https://www.google.com/maps/search/?api=1&query=${enc(q)}`;
+const fmtDate = (d) => (d ? new Date(d + "T00:00").toLocaleDateString(undefined, { day: "numeric", month: "short" }) : "");
+const ymd = (d) => d.replaceAll("-", "");
+const addDays = (d, n) => { const x = new Date(d + "T00:00"); x.setDate(x.getDate() + n); return x.toISOString().slice(0, 10); };
+
+// Photos come from Wikipedia's open API (no key); a coloured placeholder stays if nothing is found.
+const imgCache = new Map();
+function wikiImage(query, size = 640) {
+  if (!imgCache.has(query)) {
+    const url = `https://en.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch=${enc(query)}&gsrlimit=1&prop=pageimages&piprop=thumbnail&pithumbsize=${size}&format=json&origin=*`;
+    imgCache.set(query, fetch(url).then((r) => r.json()).then((j) => Object.values(j.query?.pages || {})[0]?.thumbnail?.source || null).catch(() => null));
+  }
+  return imgCache.get(query);
+}
+function lazyImage(holder, query, alt) {
+  wikiImage(query).then((src) => {
+    if (!src) return;
+    const img = new Image();
+    img.alt = alt; img.loading = "lazy"; img.src = src;
+    img.onload = () => holder.prepend(img);
+  });
+}
+
+function transportLinks(t, mode) {
+  const m = String(mode || t.mode || "").toLowerCase();
+  const india = t.currency === "INR";
+  const out = [];
+  if (m.includes("flight") || m === "mixed") out.push(["Search flights", `https://www.google.com/travel/flights?q=${enc(`Flights from ${t.origin} to ${t.destination} on ${t.start_date} returning ${t.end_date}`)}`]);
+  if (m.includes("train")) out.push(india ? ["Book on IRCTC", "https://www.irctc.co.in/nget/train-search"] : ["Search trains", `https://www.google.com/search?q=${enc(`trains from ${t.origin} to ${t.destination} ${t.start_date}`)}`]);
+  if (m.includes("bus")) out.push(india ? ["Book on redBus", "https://www.redbus.in/"] : ["Search buses", `https://www.google.com/search?q=${enc(`bus tickets ${t.origin} to ${t.destination} ${t.start_date}`)}`]);
+  const travelmode = m.includes("car") ? "driving" : m.includes("train") || m.includes("bus") ? "transit" : "";
+  out.push(["Open route in Google Maps", `https://www.google.com/maps/dir/?api=1&origin=${enc(t.origin)}&destination=${enc(t.destination)}${travelmode ? `&travelmode=${travelmode}` : ""}`]);
+  return out;
+}
+
+const linkRow = (links) => `<div class="links">${links.map(([label, href]) => `<a href="${esc(href)}" target="_blank" rel="noopener">${esc(label)}</a>`).join("")}</div>`;
+
+function legsHtml(title, legs, cur) {
+  if (!Array.isArray(legs) || !legs.length) return "";
+  return `<div class="leg-dir">${esc(title)}</div><ol class="legs">${legs.map((l) => `
+    <li class="leg">
+      <div class="leg-time">${esc(l.depart || "")}<small>${esc(l.arrive || "")}</small></div>
+      <div class="leg-what">${esc(l.from)} to ${esc(l.to)}<small>${esc([l.mode, l.service, l.duration].filter(Boolean).join(", "))}${l.notes ? `. ${esc(l.notes)}` : ""}</small></div>
+      <div class="leg-cost">${money(l.est_cost) ? `${money(l.est_cost)} ${esc(cur)}` : ""}</div>
+    </li>`).join("")}</ol>`;
+}
+
+function renderPlan(plan) {
+  const t = plan.trip || {};
+  const cur = t.currency || "";
+  const wrap = document.createElement("section");
+  wrap.className = "plan";
+  const tr = plan.transport, st = plan.stays, ac = plan.activities;
+
+  // Route: legs, embedded map and booking links.
+  if (tr && t.origin && t.destination) {
+    const flight = String(tr.mode || t.mode).toLowerCase().includes("flight");
+    const embed = flight
+      ? `https://maps.google.com/maps?q=${enc(t.destination)}&z=11&output=embed`
+      : `https://maps.google.com/maps?saddr=${enc(t.origin)}&daddr=${enc(t.destination)}&output=embed`;
+    const b = document.createElement("div");
+    b.className = "block"; b.style.setProperty("--c", "var(--a-flights)");
+    b.innerHTML = `<h4>${icon("transport")}Your route</h4>
+      ${legsHtml(`Outbound, ${fmtDate(t.start_date)}`, tr.outbound, cur)}${legsHtml(`Return, ${fmtDate(t.end_date)}`, tr.return, cur)}
+      <iframe class="map" loading="lazy" title="Map of the route" src="${esc(embed)}" referrerpolicy="no-referrer-when-downgrade"></iframe>
+      ${flight ? `<p class="map-note">Map shows ${esc(t.destination)}. Open the route for directions to and from the airport.</p>` : ""}
+      ${tr.local_transport ? `<p class="map-note">Getting around: ${esc(tr.local_transport)}</p>` : ""}
+      ${linkRow(transportLinks(t, tr.mode))}`;
+    wrap.append(b);
+  }
+
+  // Stays: three options with booking links for the trip dates and party size.
+  if (Array.isArray(st?.options) && st.options.length) {
+    const b = document.createElement("div");
+    b.className = "block"; b.style.setProperty("--c", "var(--a-stays)");
+    b.innerHTML = `<h4>${icon("stays")}Where to stay</h4><div class="stays">${st.options.slice(0, 3).map((o, i) => {
+      const q = `${o.name}, ${o.area || ""} ${t.destination}`;
+      const booking = `https://www.booking.com/searchresults.html?ss=${enc(`${o.name} ${t.destination}`)}&checkin=${t.start_date}&checkout=${t.end_date}&group_adults=${t.travelers || 1}&no_rooms=1`;
+      const google = `https://www.google.com/travel/search?q=${enc(`${o.name} ${t.destination}`)}`;
+      const prefer = `${t.platforms || ""} ${o.platform || ""} ${o.type || ""}`.toLowerCase();
+      const extra = [];
+      if (/airbnb|villa|apartment|homestay/.test(prefer)) extra.push(["Airbnb", `https://www.airbnb.com/s/${enc(t.destination)}/homes?checkin=${t.start_date}&checkout=${t.end_date}&adults=${t.travelers || 1}&query=${enc(`${o.area || ""} ${t.destination}`)}`]);
+      if (/makemytrip|mmt/.test(prefer)) extra.push(["MakeMyTrip", `https://www.google.com/search?q=${enc(`${o.name} ${t.destination} site:makemytrip.com`)}`]);
+      if (/agoda/.test(prefer)) extra.push(["Agoda", `https://www.agoda.com/search?textToSearch=${enc(`${o.name} ${t.destination}`)}`]);
+      if (/goibibo/.test(prefer)) extra.push(["Goibibo", `https://www.google.com/search?q=${enc(`${o.name} ${t.destination} site:goibibo.com`)}`]);
+      return `<div class="stay${i === (st.recommended ?? 0) ? " top" : ""}">
+        ${i === (st.recommended ?? 0) ? `<span class="tag">Adviser's pick</span>` : ""}
+        <b>${esc(o.name)}</b><span class="where">${esc([o.type, o.area, o.rooms].filter(Boolean).join(", "))}</span>
+        <span class="why">${esc(o.why || "")}</span>
+        <span class="price">${money(o.est_per_night) ? `${money(o.est_per_night)} ${esc(cur)} <small>per night</small>` : ""}${money(o.est_total) ? `<br><small>about ${money(o.est_total)} ${esc(cur)} for the stay</small>` : ""}</span>
+        ${o.platform ? `<span class="where">Best booked on ${esc(o.platform)}</span>` : ""}
+        ${linkRow([...extra, ["Booking.com", booking], ["Google Hotels", google], ["Map", mapsSearch(q)]])}
+      </div>`;
+    }).join("")}</div>`;
+    wrap.append(b);
+  }
+
+  // Places: unique named stops from the day plan, each with a photo and a map link.
+  const seen = new Set();
+  const places = [];
+  for (const d of ac?.days || []) for (const it of d.items || []) {
+    const name = String(it.place || "").trim();
+    const home = t.origin && name.toLowerCase().includes(String(t.origin).toLowerCase());
+    if (!name || home || seen.has(name.toLowerCase()) || /hotel|airport|station|junction|terminal|bus stand|depot|check.?in|check.?out/i.test(name)) continue;
+    seen.add(name.toLowerCase());
+    places.push({ name, day: d.day });
+  }
+  if (places.length) {
+    const b = document.createElement("div");
+    b.className = "block"; b.style.setProperty("--c", "var(--a-activities)");
+    b.innerHTML = `<h4>${icon("activities")}Places you'll visit</h4><div class="places"></div>`;
+    const grid = $(".places", b);
+    for (const p of places.slice(0, 12)) {
+      const a = document.createElement("a");
+      a.className = "place"; a.target = "_blank"; a.rel = "noopener";
+      a.href = mapsSearch(`${p.name}, ${t.destination}`);
+      a.innerHTML = `<div class="ph">${icon("activities", 22)}</div><span>${esc(p.name)}<small>Day ${esc(p.day)}, open in Maps</small></span>`;
+      const ph = $(".ph", a);
+      wikiImage(`${p.name} ${t.destination}`, 400).then((src) => { if (src) ph.innerHTML = `<img src="${esc(src)}" alt="${esc(p.name)}" loading="lazy">`; });
+      grid.append(a);
+    }
+    wrap.append(b);
+  }
+
+  // Local insider: what the place is known for, drinks, events, swaps, add-ons and the budget check.
+  const lx = plan.local;
+  if (lx) {
+    const b = document.createElement("div");
+    b.className = "block insider"; b.style.setProperty("--c", "var(--a-local)");
+    const list = (title, items, fn) => (Array.isArray(items) && items.length ? `<h5>${title}</h5><ul>${items.map(fn).join("")}</ul>` : "");
+    const mapped = (name) => `<a href="${esc(mapsSearch(`${name}, ${t.destination}`))}" target="_blank" rel="noopener">${esc(name)}</a>`;
+    b.innerHTML = `<h4>${icon("local")}Local insider: ${esc(t.destination)}</h4>
+      ${lx.famous_for?.length ? `<div class="known">${lx.famous_for.map((f) => `<span title="${esc(f.detail || "")}">${esc(f.title)}</span>`).join("")}</div>` : ""}
+      <div class="insider-grid">
+        <div>${list("Must-try food", lx.signature_food, (f) => `<li><b>${esc(f.dish)}</b> <small>at</small> ${mapped(f.where)}</li>`)}
+             ${list("Local drinks", lx.drinks, (d) => `<li><b>${esc(d.name)}</b> <small>at</small> ${mapped(d.where)}${d.note ? `<br><small>${esc(d.note)}</small>` : ""}</li>`)}
+             ${list("On during your dates", lx.events, (e) => `<li><b>${esc(e.name)}</b><br><small>${esc([e.when, e.where].filter(Boolean).join(", "))}</small></li>`)}</div>
+        <div>${list("Fresh picks", lx.hidden_gems, (g) => `<li>${mapped(g.place)}${g.instead_of ? ` <small>instead of ${esc(g.instead_of)}</small>` : ""}<br><small>${esc(g.why || "")}</small></li>`)}
+             ${list("Make it better", lx.add_ons, (o) => `<li><b>${esc(o.title)}</b>${money(o.est_cost) ? ` <small>about ${money(o.est_cost)} ${esc(cur)}</small>` : ""}<br><small>${esc(o.why || "")}</small></li>`)}</div>
+      </div>
+      ${lx.budget_check || lx.skip_if_tight?.length ? `<div class="tight"><h5>Budget check</h5>${lx.budget_check ? `<p>${esc(lx.budget_check)}</p>` : ""}
+        ${list("If money runs short, skip first", lx.skip_if_tight, (k) => `<li>${esc(k.item)}${money(k.saves) ? ` <small>saves about ${money(k.saves)} ${esc(cur)}</small>` : ""}</li>`)}</div>` : ""}`;
+    wrap.append(b);
+  }
+
+  // Food picks with map links.
+  if (Array.isArray(ac?.food) && ac.food.length) {
+    const b = document.createElement("div");
+    b.className = "block";
+    b.innerHTML = `<h4>${icon("composer")}Where to eat</h4><ul class="eat">${ac.food.map((f) =>
+      `<li><a href="${esc(mapsSearch(`${f.name}, ${f.area || ""} ${t.destination}`))}" target="_blank" rel="noopener">${esc(f.name)}</a>
+        <small>${esc([f.area, f.try && `try ${f.try}`].filter(Boolean).join(", "))}</small>${f.why ? `<br><small>${esc(f.why)}</small>` : ""}</li>`).join("")}</ul>`;
+    wrap.append(b);
+  }
+  return wrap;
+}
+
+// ---------- Trip header: shown above the plan text ----------
+const cap = (v) => String(v || "").replace(/\b\w/g, (c) => c.toUpperCase());
+function nightsOf(t) { return t.start_date && t.end_date ? Math.max(0, Math.round((Date.parse(t.end_date) - Date.parse(t.start_date)) / 864e5)) : null; }
+function dateRange(t) {
+  if (!t.start_date || !t.end_date) return "";
+  const a = new Date(t.start_date + "T00:00"), b = new Date(t.end_date + "T00:00");
+  const month = (d) => d.toLocaleDateString("en-GB", { month: "long" });
+  return a.getMonth() === b.getMonth() && a.getFullYear() === b.getFullYear()
+    ? `${a.getDate()}–${b.getDate()} ${month(b)} ${b.getFullYear()}`
+    : `${a.getDate()} ${month(a)} – ${b.getDate()} ${month(b)} ${b.getFullYear()}`;
+}
+const known = (v) => v && v !== "none";
+
+function renderHeader(plan) {
+  const t = plan.trip || {};
+  const cur = t.currency || "";
+  const n = Number(t.travelers) || 1;
+  const nights = nightsOf(t);
+  const road = /car|drive/i.test(String(t.mode)) || /car/i.test(String(plan.transport?.mode));
+  const head = document.createElement("header");
+  head.className = "trip-head";
+  const who = t.companions && known(t.companions) ? `${n} ${t.companions === "partner" ? "travellers (couple)" : t.companions}` : `${n} traveller${n > 1 ? "s" : ""}`;
+
+  // "I've used your trip profile…": the constraints this plan honours, so the traveller can check them at a glance.
+  const used = [`${who} travelling${known(t.mode) ? ` by ${String(t.mode).toLowerCase()}` : ""} from ${cap(t.origin)}`];
+  if (known(t.stay_pref)) used.push(`staying in a ${String(t.stay_pref).toLowerCase()}`);
+  if (t.rules?.length) used.push(`following your rules (${t.rules.join("; ")})`);
+  const seen = known(t.seen_places) ? `I've also left out ${t.seen_places} because you've already been there.` : "";
+
+  const tagline = [known(t.occasion) && t.occasion !== "holiday" ? cap(t.occasion) : null,
+    known(t.interests) ? `${cap(t.destination)} for ${String(t.interests).toLowerCase()}` : cap(t.destination)].filter(Boolean).join(": ");
+
+  // Budget reality: what they have against what the trip realistically needs.
+  const total = Number(t.total_budget) || Number(t.budget) || 0;
+  const rb = plan.local?.realistic_budget || {};
+  const est = ["transport", "stays", "activities"].reduce((sum, k) => sum + (Number(plan[k]?.est_total) || 0), 0);
+  const low = Number(rb.low), high = Number(rb.high);
+  const tight = low > total * 1.1;
+  const short = (v) => (v >= 1000 ? `${Math.round(v / 1000)}k` : money(v));
+  const tiles = [
+    `<div class="tile"><small>Your total budget</small><b>${money(total)} ${esc(cur)}</b><small>${money(total / n)} per person</small></div>`,
+    low ? `<div class="tile${tight ? " warn" : ""}"><small>Realistic budget for these dates</small><b>${short(low)}–${short(high || low)} ${esc(cur)}</b><small>${money(low / n)}–${money((high || low) / n)} per person</small></div>` : "",
+    est ? `<div class="tile"><small>This plan's estimate</small><b>${money(est)} ${esc(cur)}</b><small>before food and local transport</small></div>` : "",
+  ].join("");
+
+  head.innerHTML = `<h2>${esc(cap(t.destination))} ${road ? "road trip" : "trip"}: ${esc(cap(t.origin))} → ${esc(cap(t.destination))}</h2>
+    <div class="chips"><span class="chip ok">Trip planned</span><span class="chip info">${esc(who)}</span>
+      ${nights !== null ? `<span class="chip">${nights} night${nights === 1 ? "" : "s"} / ${nights + 1} days</span>` : ""}
+      ${known(t.occasion) && t.occasion !== "holiday" ? `<span class="chip">${esc(cap(t.occasion))}</span>` : ""}</div>
+    <div class="collage"><div class="ph"></div><div class="ph"></div><div class="ph"></div></div>
+    <h3 class="dates">${esc(dateRange(t))}</h3>
+    <p class="tagline">${esc(tagline)}</p>
+    <p class="used">I've used your trip profile: ${esc(used.join(", "))}. ${esc(seen)}</p>
+    <div class="links"><button type="button" data-ics>Add to calendar with reminders</button><a target="_blank" rel="noopener" href="${esc(googleCalUrl(plan))}">Google Calendar</a></div>
+    <section class="reality"><h3>First, the budget reality</h3><div class="tiles">${tiles}</div>
+      ${plan.local?.budget_check ? `<p>${esc(plan.local.budget_check)}</p>` : ""}</section>`;
+  $("[data-ics]", head).onclick = () => downloadIcs(plan);
+
+  // Photos: the destination, then the first fresh picks or planned places.
+  const picks = [t.destination, ...(plan.local?.hidden_gems || []).map((g) => `${g.place} ${t.destination}`),
+    ...(plan.activities?.days || []).flatMap((d) => (d.items || []).map((i) => `${i.place} ${t.destination}`))];
+  const slots = head.querySelectorAll(".collage .ph");
+  let next = 0;
+  const fill = async (slot) => {
+    while (next < picks.length) {
+      const src = await wikiImage(picks[next++], 800);
+      if (src && ![...head.querySelectorAll(".collage img")].some((i) => i.src === src)) { slot.innerHTML = `<img src="${esc(src)}" alt="" loading="lazy">`; return; }
+    }
+  };
+  (async () => { for (const sl of slots) await fill(sl); })();
+  return head;
+}
+
+// ---------- Calendar export ----------
+function icsText(v) { return String(v ?? "").replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\r?\n/g, "\\n"); }
+function icsFold(line) { // RFC 5545: lines longer than 75 octets are folded
+  const out = [];
+  while (line.length > 74) { out.push(line.slice(0, 74)); line = " " + line.slice(74); }
+  out.push(line);
+  return out.join("\r\n");
+}
+const hhmm = (s) => (/^\d{1,2}:\d{2}$/.test(String(s || "").trim()) ? String(s).trim().padStart(5, "0").replace(":", "") + "00" : null);
+
+function calendarEvents(plan) {
+  const t = plan.trip || {};
+  const ev = [];
+  const where = t.destination;
+  if (t.start_date) {
+    ev.push({ allDay: true, date: addDays(t.start_date, -2), title: `Pack for ${where}`, desc: "Check tickets, ID, chargers and medicines.", alarms: ["PT9H"] });
+  }
+  for (const [legs, date] of [[plan.transport?.outbound, t.start_date], [plan.transport?.return, t.end_date]]) {
+    for (const l of legs || []) {
+      const start = hhmm(l.depart);
+      if (!start || !date) continue;
+      let end = hhmm(l.arrive) || start;
+      const endDate = end < start ? addDays(date, 1) : date;
+      ev.push({ start: `${ymd(date)}T${start}`, end: `${ymd(endDate)}T${end}`, title: `${l.mode || "Travel"}: ${l.from} to ${l.to}`, desc: [l.service, l.notes].filter(Boolean).join(". "), loc: l.from, alarms: ["-P1D", "-PT3H"] });
+    }
+  }
+  for (const d of plan.activities?.days || []) {
+    if (!d.date) continue;
+    ev.push({ allDay: true, date: d.date, title: `Day ${d.day} in ${where}: ${d.title || ""}`, loc: where,
+      desc: (d.items || []).map((i) => `${i.time || ""} ${i.place || ""}: ${i.what || ""}`.trim()).join("\n"), alarms: ["-PT15H", "PT8H"] });
+  }
+  return ev;
+}
+
+function downloadIcs(plan) {
+  const stamp = new Date().toISOString().replace(/[-:]/g, "").slice(0, 15) + "Z";
+  const lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Travel Team//Trip Plan//EN", "CALSCALE:GREGORIAN"];
+  for (const e of calendarEvents(plan)) {
+    lines.push("BEGIN:VEVENT", `UID:${crypto.randomUUID()}@travel-team`, `DTSTAMP:${stamp}`);
+    if (e.allDay) lines.push(`DTSTART;VALUE=DATE:${ymd(e.date)}`, `DTEND;VALUE=DATE:${ymd(addDays(e.date, 1))}`);
+    else lines.push(`DTSTART:${e.start}`, `DTEND:${e.end}`);
+    lines.push(`SUMMARY:${icsText(e.title)}`);
+    if (e.desc) lines.push(`DESCRIPTION:${icsText(e.desc)}`);
+    if (e.loc) lines.push(`LOCATION:${icsText(e.loc)}`);
+    for (const a of e.alarms) lines.push("BEGIN:VALARM", "ACTION:DISPLAY", `DESCRIPTION:${icsText(e.title)}`, `TRIGGER:${a}`, "END:VALARM");
+    lines.push("END:VEVENT");
+  }
+  lines.push("END:VCALENDAR");
+  const blob = new Blob([lines.map(icsFold).join("\r\n")], { type: "text/calendar" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `${(plan.trip?.destination || "trip").replace(/[^\w-]+/g, "-")}-plan.ics`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+function googleCalUrl(plan) {
+  const t = plan.trip || {};
+  if (!t.start_date || !t.end_date) return "https://calendar.google.com/";
+  const details = (plan.activities?.days || []).map((d) => `Day ${d.day}: ${d.title || ""}`).join("\n").slice(0, 1500);
+  return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${enc(`Trip to ${t.destination}`)}&dates=${ymd(t.start_date)}/${ymd(addDays(t.end_date, 1))}&details=${enc(details)}&location=${enc(t.destination)}`;
+}
+
+// ---------- Sending ----------
+async function send(message, { resend = false, asAnswer = false, skip = false } = {}) {
+  message = message.trim();
+  if (!message || sending) return;
+  sending = true;
+  updateSend();
+  hideAsk();
+  try {
+    if (!current) {
+      const s = await api("/api/sessions", { method: "POST" });
+      current = s.id;
+      localStorage.setItem("session", s.id);
+      chat.innerHTML = "";
+      brief = null;
+      loadSessions();
+    }
+  } catch (err) {
+    sending = false; updateSend();
+    return addUser(message), new Turn().fail(`Couldn't start a new trip: ${err.message}`);
+  }
+  const sessionId = current;
+  chat.querySelectorAll(".choices").forEach((c) => c.remove());
+  // Answers go into the live trip brief; anything else is a normal chat message.
+  const quiet = asAnswer && brief;
+  if (quiet) brief.thinking(skip ? "Skipped" : message);
+  else if (!resend) addUser(message);
+  stick = true;
+  const turn = new Turn();
+  if (quiet) turn.el.hidden = true; // only appears if the team starts working or replies in chat
+  turn.live();
+  const reveal = () => { if (turn.el.hidden) { turn.el.hidden = false; chat.append(turn.el); } };
+  try {
+    const r = await fetch(`/api/sessions/${sessionId}/chat`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message, skip, answer: asAnswer }),
+    });
+    if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || `Request failed (${r.status})`);
+    // The server runs the turn as a background job; poll its events (AppSail caps request duration).
+    let seen = 0, ended = false, misses = 0;
+    while (!ended) {
+      await new Promise((ok) => setTimeout(ok, 1000));
+      let j;
+      try { j = await api(`/api/sessions/${sessionId}/events?after=${seen}`); }
+      catch { if (++misses > 5) break; continue; }
+      misses = 0;
+      seen += j.events.length;
+      for (const ev of j.events) {
+        if (current !== sessionId) continue; // switched trips; the reply is still saved
+        if (ev.type === "final" || ev.type === "error") ended = true;
+        if (ev.type === "final") {
+          if (ev.ask && !ev.plan) {
+            if (ev.text) { reveal(); turn.finish(ev.text, true); } else turn.el.remove();
+            (brief ??= new Brief()).update(ev.profile, ev.ask);
+            showAsk(ev.ask);
+          } else {
+            if (brief) { brief.complete(ev.profile); brief = null; }
+            reveal(); turn.finish(ev.text, true, ev);
+          }
+        } else if (ev.type === "error") { reveal(); turn.fail(ev.error.replace(/^Error:\s*/, ""), () => send(message, { resend: true })); }
+        else {
+          if (brief) { brief.complete(); brief = null; } // the team has started: the brief is settled
+          reveal(); turn.event(ev);
+        }
+      }
+      if (j.done && !ended) break;
+    }
+    // Lost track of the job (network or another instance): the finished reply is saved, so reload it.
+    if (!ended && current === sessionId) { clearInterval(turn.timer); setTimeout(() => openSession(sessionId), 1500); }
+  } catch (err) {
+    reveal();
+    turn.fail(err.message, () => send(message, { resend: true }));
+  } finally {
+    clearInterval(turn.timer);
+    sending = false;
+    updateSend();
+    loadSessions();
+  }
+}
+
+const input = $("#input");
+function grow() {
+  input.style.height = "auto";
+  input.style.height = Math.min(input.scrollHeight, 200) + "px";
+  input.style.overflowY = input.scrollHeight > 200 ? "auto" : "hidden";
+}
+function updateSend() { $("#send").disabled = sending || !input.value.trim(); }
+input.addEventListener("input", () => { grow(); updateSend(); });
+input.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); $("#form").requestSubmit(); }
+});
+$("#form").onsubmit = (e) => {
+  e.preventDefault();
+  if (sending) return;
+  const text = input.value;
+  input.value = ""; grow(); updateSend();
+  send(text);
+};
+
+(async () => {
+  try {
+    const list = await loadSessions();
+    const saved = localStorage.getItem("session");
+    const pick = list.find((s) => s.id === saved);
+    pick ? openSession(pick.id) : renderEmpty();
+  } catch (err) {
+    renderEmpty();
+    chat.insertAdjacentHTML("afterbegin", `<div class="turn"><div class="err-box">Couldn't load your trips: ${esc(err.message)}</div></div>`);
+  }
+  input.focus();
+})();
+</script>
+</body>
+</html>

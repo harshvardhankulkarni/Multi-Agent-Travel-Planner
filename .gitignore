@@ -1,0 +1,6 @@
+node_modules/
+.env
+.playwright-mcp/
+.mcp.json
+catalyst-debug.log
+.vscode/
