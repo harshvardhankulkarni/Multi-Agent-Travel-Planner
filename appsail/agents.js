@@ -111,7 +111,7 @@ function profile(t) {
 const FIELDS = ["destination", "origin", "start_date", "end_date", "travelers", "companions", "budget", "currency", "budget_basis",
   "mode", "visited", "seen_places", "bookings", "occasion", "interests", "food", "drinks", "stay_pref", "platforms", "special"];
 
-const EXTRACT_SYSTEM = `You are the intake step of an expert travel adviser. Today is ${today()}.
+const extractSystem = () => `You are the intake step of an expert travel adviser. Today is ${today()}.
 You receive the traveller profile collected so far, the question that was just asked, and the user's new message.
 
 Return only one JSON object:
@@ -402,7 +402,7 @@ export async function orchestrate(app, context, recent, userText, emit, { skip =
   if (skip && pendingSlot && !pendingSlot.required) trip[pendingSlot.key] = NONE;
   else {
     ex = await chatJson(app, [
-      { role: "system", content: EXTRACT_SYSTEM },
+      { role: "system", content: extractSystem() },
       {
         role: "user",
         content: `Profile so far:\n${JSON.stringify(trip)}\n\nQuestion just asked: ${context.pendingQuestion || "(none)"}\n` +
@@ -420,7 +420,7 @@ export async function orchestrate(app, context, recent, userText, emit, { skip =
   if (updates.special && context.pending !== "special") delete updates.special;
   if (updates.visited && context.pending !== "visited" && !/before|visited|been|first (time|trip)|times/i.test(userText)) delete updates.visited;
   // An optional question answered in free text counts as answered, even if the extractor filed it elsewhere (e.g. as a rule).
-  if (pendingSlot && !pendingSlot.required && !skip && ex.intent !== "question" && pendingSlot.missing({ ...trip, ...updates }) && userText.trim()) {
+  if (pendingSlot && !pendingSlot.required && !skip && ex.intent === "answer" && pendingSlot.missing({ ...trip, ...updates }) && userText.trim()) {
     updates[pendingSlot.key] = pendingSlot.key === "visited"
       ? (/first|never|\bno\b/i.test(userText) ? "first_time" : "been_before") : userText.trim();
   }
@@ -580,7 +580,7 @@ export function buildMasterPrompt(context) {
     "## Role 1: Intake agent",
     "Turns each traveller message into profile updates. It never guesses, and the next unanswered question is asked one at a time.",
     "### System prompt",
-    block(EXTRACT_SYSTEM),
+    block(extractSystem()),
     ...roles.flatMap(([name, key, what], i) => [
       "", `## Role ${i + 2}: ${name}`, what,
       "### System prompt", block(SPECIALISTS[key]),
